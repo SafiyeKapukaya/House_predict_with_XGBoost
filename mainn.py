@@ -146,7 +146,9 @@ hyperparameter_grid = {
     'learning_rate':learning_rate,
     'min_child_weight':min_child_weight,
     }
-
+bool_columns = main_df.select_dtypes(include='bool').columns
+main_df[bool_columns] = main_df[bool_columns].astype(int)
+#Model#####################################
 xgboost_best_gs = GridSearchCV(model,
                             hyperparameter_grid,
                             cv=3,
