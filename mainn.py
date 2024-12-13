@@ -134,21 +134,17 @@ X_train=df_Train.drop(['SalePrice'],axis=1)
 y_train=np.log1p(df_Train['SalePrice'])
 X_test = df_test
 model = XGBRegressor()
-booster=['gbtree','gblinear']
-base_score=[0.25,0.5,0.75,1]
+
 n_estimators = [100, 500, 900, 1100, 1500]
 max_depth = [2, 3, 5, 10, 15]
-booster=['gbtree','gblinear']
-learning_rate=[0.05,0.1,0.15,0.20]
-min_child_weight=[1,2,3,4]
+learning_rate=[0.1,0.2]
+min_child_weight=[2,4]
 
 hyperparameter_grid = {
     'n_estimators': n_estimators,
     'max_depth':max_depth,
     'learning_rate':learning_rate,
     'min_child_weight':min_child_weight,
-    'booster':booster,
-    'base_score':base_score
     }
 
 xgboost_best_gs = GridSearchCV(model,
