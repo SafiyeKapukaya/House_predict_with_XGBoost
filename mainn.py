@@ -1,15 +1,10 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import warnings
-from lightgbm import LGBMRegressor
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import train_test_split, cross_val_score,GridSearchCV
+from sklearn.model_selection import cross_val_score,GridSearchCV
 from xgboost import XGBRegressor
-
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter("ignore", category=ConvergenceWarning)
@@ -18,6 +13,7 @@ pd.set_option('display.max_rows', None)
 pd.set_option('display.width', None)
 df_train = pd.read_csv("dataset/train.csv")
 df_test = pd.read_csv("dataset/test.csv")
+
 def missing_values_table(dataframe, na_name=False):
     na_columns = [col for col in dataframe.columns if dataframe[col].isnull().sum() > 0]
 
@@ -41,7 +37,7 @@ missing_values_table(df_test)
 drop_list = ['Id','PoolQC','MiscFeature','Alley','Fence','MasVnrType']
 df_train.drop(drop_list,axis=1,inplace=True)
 df_test.drop(drop_list,axis=1,inplace=True)
-print("ok")
+
 def grab_col_names(dataframe, cat_th=10, car_th=20):
     cat_cols = [col for col in dataframe.columns if dataframe[col].dtypes == "O"]
     num_but_cat = [col for col in dataframe.columns if dataframe[col].nunique() < cat_th and dataframe[col].dtypes != "O"]
@@ -79,10 +75,17 @@ for col in na_cols_train:
 for col in na_cols_test:
     fill_missing_values(df_test,col)
 
+print("##########test#############")
+missing_values_table(df_test)
+print("##########train#############")
+missing_values_table(df_train)
+
 main_df = pd.concat([df_train,df_test])
+main_df.isnull().sum()
+main_df.drop(['Neighborhood'],axis=1,inplace=True)
+
 # rare encoding step
 cat_cols,num_cols,cat_but_car = grab_col_names(main_df)
-main_df.drop(['Neighborhood'],axis=1,inplace=True)
 def rare_analyser(dataframe, target, cat_cols):
     for col in cat_cols:
         print(col, ":", len(dataframe[col].value_counts()))
@@ -106,7 +109,6 @@ def rare_encoder(dataframe, rare_perc):
 rare_encoder(main_df,0.01)
 rare_analyser(main_df, "SalePrice", cat_cols)
 
-
 cat_cols, cat_but_car, num_cols = grab_col_names(main_df)
 def label_encoder(dataframe, binary_col):
     labelencoder = LabelEncoder()
@@ -127,35 +129,32 @@ main_df = one_hot_encoder(main_df, cat_cols, drop_first=True)
 bool_columns = main_df.select_dtypes(include='bool').columns
 main_df[bool_columns] = main_df[bool_columns].astype(int)
 main_df =main_df.loc[:,~main_df.columns.duplicated()]
+
 df_Train=main_df.iloc[:1460,:]
 df_Test=main_df.iloc[1460:,:]
+
 df_Test.drop(['SalePrice'],axis=1,inplace=True)
 X_train=df_Train.drop(['SalePrice'],axis=1)
 y_train=np.log1p(df_Train['SalePrice'])
-X_test = df_test
+
 model = XGBRegressor()
-
-n_estimators = [100, 500, 900, 1100, 1500]
-max_depth = [2, 3, 5, 10, 15]
-learning_rate=[0.1,0.2]
-min_child_weight=[2,4]
-
 hyperparameter_grid = {
-    'n_estimators': n_estimators,
-    'max_depth':max_depth,
-    'learning_rate':learning_rate,
-    'min_child_weight':min_child_weight,
-    }
-bool_columns = main_df.select_dtypes(include='bool').columns
-main_df[bool_columns] = main_df[bool_columns].astype(int)
-#Model#####################################
+    'n_estimators': [100, 500],
+    'max_depth': [3, 5],
+    'learning_rate': [0.1],
+    'min_child_weight': [2],
+}
+
 xgboost_best_gs = GridSearchCV(model,
                             hyperparameter_grid,
                             cv=3,
                             n_jobs=-1,
                             verbose=True).fit(X_train, y_train)
-
+print(xgboost_best_gs.best_params_)
 final_model = model.set_params(**xgboost_best_gs.best_params_).fit(X_train, y_train)
-predictions = final_model.predict(X_test)
+import joblib
+joblib.dump(final_model, 'final_model.pkl')
+predictions = final_model.predict(df_Test)
+y_pred_df = pd.DataFrame(predictions)
 rmse = np.mean(np.sqrt(-cross_val_score(final_model, X_train, y_train, cv=5, scoring="neg_mean_squared_error")))
-print(f"last xgboost rmse : {rmse}")
+print(f"xgboost rmse : {rmse}")
